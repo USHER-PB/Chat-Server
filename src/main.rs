@@ -11,7 +11,7 @@ use std::net::TcpListener;
  fn main(){
 
     let messages = Arc::new(Mutex::new(Vec::new()));
-    let listener = match TcpListener::bind("192.168.255.26:8789"){
+    let listener = match TcpListener::bind("192.168.2.123:8789"){
         Ok(listener) => listener,
         Err(e) => {
             eprintln!("no listener found  {}", e);

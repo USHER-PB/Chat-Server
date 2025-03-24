@@ -45,7 +45,7 @@ pub(crate) fn connection(mut stream: TcpStream, messages: Arc<Mutex<Vec<String>>
 
         // Handle GET /send
         if request_parts[0] == "GET" && request_parts[1] == "/send" {
-            let messages_guard = match messages.lock() {
+            let message = match messages.lock() {
                 Ok(messages) => messages,
                 Err(e) => {
                     eprintln!("Failed to lock messages: {}", e);
@@ -55,7 +55,19 @@ pub(crate) fn connection(mut stream: TcpStream, messages: Arc<Mutex<Vec<String>>
                 }
             };
 
-            let response_body = format!("{:?}", *messages_guard);
+      
+            let formatted_messages: Vec<Vec<String>> = message
+            .iter()
+            .map(|m| m.split("\r\n").map(String::from).collect())
+            .collect();
+    
+        let response_body = match serde_json::to_string_pretty(&formatted_messages) {
+            Ok(body) => body,
+            Err(e) => {
+                eprintln!("Formatting failed: {}", e);
+                return;
+            }
+        };
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
                 response_body.len(),
@@ -68,8 +80,9 @@ pub(crate) fn connection(mut stream: TcpStream, messages: Arc<Mutex<Vec<String>>
         }
         // Handle POST /retrieve
         else if request_parts[0] == "POST" && request_parts[1] == "/retrieve" {
+
+            let request = request.to_string();
             // Collect remaining lines as body
-            let body: String = request_lines.collect::<Vec<&str>>().join("\n");
 
             let mut messages_guard = match messages.lock() {
                 Ok(messages) => messages,
@@ -82,7 +95,7 @@ pub(crate) fn connection(mut stream: TcpStream, messages: Arc<Mutex<Vec<String>>
             };
 
             // Store the received message
-            messages_guard.push(body.clone());
+            messages_guard.push(request);
 
             let response = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
             if let Err(e) = stream.write_all(response.as_bytes()) {
